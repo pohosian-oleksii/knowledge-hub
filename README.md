@@ -1,59 +1,127 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Agents Knowledge Hub
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Shared memory for AI agents. One agent analyzes a project once, pushes what it learned here, and every agent after it reads that instead of re-scanning the repo. 🧠
 
-## About Laravel
+Two parts:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Laravel app** — REST API (`/api/v1`) plus a read-only web dashboard for browsing projects and their context.
+- **MCP server** (`mcp-server/`) — wraps the API as MCP tools, so Claude Code / Claude Desktop can read and write context directly.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+PHP 8.4 (FPM), Laravel 12, MySQL 8, nginx, Node + TypeScript for the MCP server. Everything runs in Docker; local domain comes from OrbStack.
 
-## Learning Laravel
+## Quick start
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+```bash
+cp .env.example .env
+make up
+docker compose exec php php artisan key:generate
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+`make up` builds the containers, installs Composer deps, runs migrations, restarts nginx and builds the MCP server.
 
-## Laravel Sponsors
+Then:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- Dashboard: https://agents-knowledge-hub.local (or http://localhost:8000)
+- API: https://agents-knowledge-hub.local/api/v1
+- MCP: https://agents-knowledge-hub.local/mcp
 
-### Premium Partners
+Other targets: `make down`, `make shell`, `make migrate`, `make mcp-build`, `make mcp-dev`.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Data model
 
-## Contributing
+```
+projects ──< context_entries ──< context_images
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+**Project** — identified by a unique `slug`. Fields: `name`, `description`, `overview`, `repo_path`.
 
-## Code of Conduct
+**ContextEntry** — one durable fact about a project. Fields: `type`, `title`, `content` (Markdown), `tags`, `source_agent`, `importance` (1–5, default 3).
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Allowed `type` values: `architecture`, `convention`, `decision`, `gotcha`, `dependency`, `glossary`, `todo`, `other`.
 
-## Security Vulnerabilities
+Entries upsert by `key`, which is derived from `type` + `title`. Same type and title → the existing entry gets updated, no duplicate. Re-running an analyzer is safe.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+**ContextImage** — screenshots or diagrams attached to an entry. Files live on disk under `storage/app/private/projects/{project_id}/context/{entry_id}/`. Only metadata goes to the DB.
 
-## License
+## API
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Base: `/api/v1`. All routes take the project `slug`.
+
+| Method | Path | What |
+|---|---|---|
+| GET | `/projects` | List projects |
+| POST | `/projects` | Create or update by `slug` |
+| GET | `/projects/{slug}` | Show project |
+| PATCH | `/projects/{slug}` | Update project |
+| GET | `/projects/{slug}/context` | List entries. Filters: `type`, `tags` (comma-separated), `importance_min` |
+| GET | `/projects/{slug}/context/summary` | All entries as one Markdown doc, grouped by type |
+| POST | `/projects/{slug}/context` | Create or update one entry |
+| POST | `/projects/{slug}/context/bulk` | Same, array of entries |
+| GET | `/projects/{slug}/context/{id}` | Show entry |
+| PATCH | `/projects/{slug}/context/{id}` | Update entry |
+| DELETE | `/projects/{slug}/context/{id}` | Delete entry |
+| GET | `/projects/{slug}/context/{id}/images` | List images |
+| POST | `/projects/{slug}/context/{id}/images` | Upload image (`filename`, `image_base64`) |
+| DELETE | `/projects/{slug}/context/{id}/images/{image_id}` | Delete image |
+| GET | `/context-images/{image_id}` | Serve image file |
+
+Example:
+
+```bash
+curl -X POST https://agents-knowledge-hub.local/api/v1/projects/my-app/context \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "gotcha",
+    "title": "Queue worker needs restart after deploy",
+    "content": "Workers cache the app code. Run `php artisan queue:restart` on every deploy.",
+    "tags": ["queue", "deploy"],
+    "importance": 4,
+    "source_agent": "project-context-analyzer"
+  }'
+```
+
+## Connecting Claude
+
+Claude Code (HTTP transport, runs in Docker):
+
+```bash
+claude mcp add --transport http agents-knowledge-hub https://agents-knowledge-hub.local/mcp
+```
+
+Claude Desktop: Settings → Connectors → Add custom connector → `https://agents-knowledge-hub.local/mcp`.
+
+stdio setup, the full tool list and image upload details are in [mcp-server/README.md](mcp-server/README.md).
+
+### Analyzer agent
+
+`project-context-analyzer.md` is a Claude Code subagent definition. Drop it into `~/.claude/agents/` and it'll scan a repo and push structured entries into the hub. Point it elsewhere with `AGENTS_HUB_URL`.
+
+## Guidelines for writing context
+
+The hub is only useful if entries stay high-signal. Rules for agents and humans alike:
+
+- **Write what isn't obvious from the code.** "Uses Laravel" is noise. "Orders are soft-deleted, but reports query `withTrashed()` on purpose" is the good stuff.
+- **One fact per entry.** Small entries upsert cleanly and filter well. A 3-page essay doesn't.
+- **Pick the right type.** `gotcha` for traps, `decision` for the why behind a choice, `convention` for house rules. Use `other` as a last resort.
+- **Titles are keys.** Change a title and you get a new entry, not an update. Keep titles stable and descriptive.
+- **Be honest with `importance`.** 5 = breaks prod if ignored. 1 = nice to know. If everything is a 5, nothing is.
+- **Tag for retrieval.** Short lowercase tags agents will filter by: `auth`, `queue`, `billing`, `docker`.
+- **Set `source_agent`.** Makes it easy to find and clean up what a misbehaving agent wrote.
+- **No secrets.** No API keys, passwords, tokens or customer data. Ever.
+- **Delete stale entries.** Wrong context is worse than none.
+
+## Development
+
+PHP rules: `declare(strict_types=1);` in every file, PSR-12, `final` classes, FormRequests for validation, enums for fixed value sets.
+
+Tests:
+
+```bash
+docker compose exec php php artisan test
+```
+
+## Security
+
+No auth on the API or the MCP endpoint. Anyone who can reach the host can read and write everything. Fine for local dev on your own machine — put auth in front before exposing it anywhere else.
