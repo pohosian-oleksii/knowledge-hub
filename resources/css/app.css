@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* Code blocks inside rendered markdown (.prose) */
+.prose :where(pre):not(:where([class~="not-prose"] *)) {
+    background-color: var(--color-slate-900);
+    color: var(--color-slate-100);
+    border: 1px solid var(--color-slate-700);
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    overflow-x: auto;
+}
+
+.prose :where(pre code):not(:where([class~="not-prose"] *)) {
+    background-color: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    font-weight: 400;
+    white-space: pre;
+}
+
+/* Inline `code` — anything not inside a <pre> */
+.prose :where(code):not(:where(pre code, [class~="not-prose"] *)) {
+    background-color: var(--color-slate-100);
+    border: 1px solid var(--color-slate-200);
+    border-radius: 0.35rem;
+    padding: 0.15em 0.4em;
+    color: var(--color-pink-700);
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.prose :where(code):not(:where(pre code, [class~="not-prose"] *))::before,
+.prose :where(code):not(:where(pre code, [class~="not-prose"] *))::after {
+    content: none;
+}

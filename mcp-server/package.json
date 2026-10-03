@@ -1,0 +1,26 @@
+{
+    "name": "agents-knowledge-hub-mcp",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "MCP server exposing the Agents Knowledge Hub API as tools for Claude.",
+    "main": "dist/index.js",
+    "bin": {
+        "agents-knowledge-hub-mcp": "dist/index.js"
+    },
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "dev": "tsx src/index.ts"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.12.0",
+        "zod": "^3.24.1"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.6",
+        "@types/node": "^22.10.2",
+        "tsx": "^4.19.2",
+        "typescript": "^5.7.2"
+    }
+}

@@ -1,0 +1,48 @@
+services:
+  php:
+    build:
+      context: ./docker/php
+    working_dir: /app
+    volumes:
+      - ./:/app
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    labels:
+      - dev.orbstack.domains=agents-knowledge-hub.local
+    volumes:
+      - ./public:/app/public:ro
+      - ./docker/nginx/site.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${APP_PORT:-8000}:80"
+    depends_on:
+      - php
+
+  mcp:
+    build:
+      context: ./mcp-server
+    environment:
+      AGENTS_HUB_API_URL: http://nginx/api/v1
+    depends_on:
+      - nginx
+
+  mysql:
+    image: mysql:8
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD"
+      interval: 2s
+      timeout: 10s
+      retries: 30
+    volumes:
+      - ./docker/volumes/mysql:/var/lib/mysql
+    ports:
+      - "${DB_FORWARD_PORT:-33061}:3306"
