@@ -94,12 +94,9 @@ Claude Desktop: Settings → Connectors → Add custom connector → `https://ag
 
 stdio setup, the full tool list and image upload details are in [mcp-server/README.md](mcp-server/README.md).
 
-### Agents and skills
+### Analyzer agent
 
-`.claude/` ships the agents and skills that work with the hub. Claude Code picks them up automatically inside this repo. To use them in other projects, copy them into `~/.claude/agents/` and `~/.claude/skills/`.
-
-- `agents/project-context-analyzer.md` scans a repo and pushes structured entries into the hub. Point it elsewhere with `AGENTS_HUB_URL`.
-- `skills/spec-loop` drives a task end to end: requirements → plan → implement → verify → review, looping on failure. It uses the `requirements-analyst`, `code-implementer`, `requirements-verifier` and `code-reviewer` agents, which ship alongside it.
+`.claude/agents/project-context-analyzer.md` scans a repo and pushes structured entries into the hub. Claude Code picks it up automatically inside this repo. To use it in other projects, copy it into `~/.claude/agents/`. Point it elsewhere with `AGENTS_HUB_URL`.
 
 ## Guidelines for writing context
 
